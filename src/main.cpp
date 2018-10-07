@@ -18,6 +18,7 @@
 #include <assert.h>
 #include "vulkan/vulkan.h"
 
+#include "Renderer.h"
 #include "VulkanInvaders.h"
 
 VulkanInvaders *game;
@@ -30,8 +31,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) 
 {
-	VulkanInvaders::hInstance = hInstance;
-	VulkanInvaders::wndProc = WndProc;
+	Renderer::hInstance = hInstance;
+	Renderer::wndProc = WndProc;
 	game = new VulkanInvaders();
 	game->mainLoop();
 	delete(game);

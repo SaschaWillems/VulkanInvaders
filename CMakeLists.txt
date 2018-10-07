@@ -77,6 +77,7 @@ add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 add_definitions(-std=c++11)
 
 file(GLOB SOURCE src/*.cpp )
+file(GLOB HEADERS src/*.h )
 
 # Compiler specific stuff
 IF(MSVC)
@@ -96,7 +97,7 @@ file(GLOB SHADERS "../data/shaders/*.*")
 source_group("Shaders" FILES ${SHADERS})
 
 if(WIN32)
-	add_executable(${NAME} WIN32 ${MAIN_CPP} ${SOURCE} ${SHADERS})
+	add_executable(${NAME} WIN32 ${MAIN_CPP} ${SOURCE} ${HEADERS} ${SHADERS})
 else(WIN32)
-	add_executable(${NAME} ${MAIN_CPP} ${SOURCE} ${SHADERS})
+	add_executable(${NAME} ${MAIN_CPP} ${SOURCE} ${HEADERS} ${SHADERS})
 endif(WIN32)
