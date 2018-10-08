@@ -13,6 +13,8 @@
 #include <string>
 #include "vulkan/vulkan.h"
 
+#include "VulkanDevice.h"
+
 #pragma once
 
 struct SwapchainResource {
@@ -82,6 +84,8 @@ public:
 	Renderer();
 	~Renderer();
 
+	VulkanDevice *vulkanDevice;
+
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
 	static HWND hWnd;
 	static HINSTANCE hInstance;
@@ -89,5 +93,8 @@ public:
 #endif
 
 	void draw();
+
+	VulkanDevice getDevice() { return *vulkanDevice; }
+	VkQueue getQueue() { return graphicsQueue; }
 };
 

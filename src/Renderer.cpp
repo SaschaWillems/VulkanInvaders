@@ -359,6 +359,8 @@ Renderer::Renderer()
 
 		// Get a graphics queue from the device
 		vkGetDeviceQueue(device, graphicsQueueFamilyIndex, 0, &graphicsQueue);
+
+		vulkanDevice = new VulkanDevice(physicalDevice, device);
 	}
 
 	// Vulkan device function pointers
@@ -574,6 +576,7 @@ Renderer::~Renderer()
 	vkDeviceWaitIdle(device);
 	vkDestroyDevice(device, nullptr);
 	vkDestroyInstance(instance, nullptr);
+	delete vulkanDevice;
 }
 
 void Renderer::updateCommandBuffers()
