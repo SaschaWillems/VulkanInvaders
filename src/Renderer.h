@@ -13,6 +13,7 @@
 #include <string>
 #include "vulkan/vulkan.h"
 
+#include "VulkanUtils.h"
 #include "VulkanDevice.h"
 
 #pragma once
@@ -96,5 +97,6 @@ public:
 
 	VulkanDevice getDevice() { return *vulkanDevice; }
 	VkQueue getQueue() { return graphicsQueue; }
+	VkCommandPool getCommandPool() { return commandPool; }
 };
 
