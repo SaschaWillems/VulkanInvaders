@@ -10,6 +10,7 @@ include_directories(external)
 include_directories(external/glm)
 include_directories(external/gli)
 include_directories(external/imgui)
+include_directories(external/tinyobjloader)
 include_directories(base)
 include_directories(src)
 
@@ -66,7 +67,7 @@ ELSE()
 ENDIF()
 
 # Set preprocessor defines
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOMINMAX -D_USE_MATH_DEFINES")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOMINMAX -D_USE_MATH_DEFINES -DTINYOBJLOADER_IMPLEMENTATION")
 
 # Clang specific stuff
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
