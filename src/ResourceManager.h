@@ -9,11 +9,12 @@
 #pragma once
 
 #include <string>
-#include <vector>
+#include <unordered_map>
 #include "vulkan/vulkan.h"
 
 #include "VulkanDevice.h"
 #include "Model.h"
+#include "Shader.h"
 
 class ResourceManager
 {
@@ -25,7 +26,12 @@ public:
 	ResourceManager(VulkanDevice &device, VkQueue queue, VkCommandPool commandPool);
 	~ResourceManager();
 
-	std::vector<Model*> models;
+	std::unordered_map<std::string, Model*> models;
+	std::unordered_map<std::string, Shader*> shaders;
 
 	Model* loadModel(std::string id, std::string filename);
+	Shader* loadShader(std::string id, std::string filename);
+
+	Shader* getShader(std::string id);
+	Model* getModel(std::string id);
 };

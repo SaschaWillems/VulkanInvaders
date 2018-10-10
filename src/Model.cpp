@@ -9,7 +9,7 @@
 #include "Model.h"
 #include "tiny_obj_loader.h"
 
-Model::Model(std::string id, std::string filename, VulkanDevice &device, VkQueue queue, VkCommandPool commandPool) : device(device), queue(queue)
+Model::Model(std::string id, std::string filename, VulkanDevice &device, VkQueue queue, VkCommandPool commandPool) : id(id), device(device), queue(queue)
 {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -35,6 +35,7 @@ Model::Model(std::string id, std::string filename, VulkanDevice &device, VkQueue
 				vertex.position = glm::make_vec3(&attrib.vertices[3 * idx.vertex_index]);
 				vertex.normal = glm::make_vec3(&attrib.normals[3 * idx.normal_index]);
 				vertex.uv = glm::make_vec2(&attrib.texcoords[2 * idx.texcoord_index]);
+				vertex.color = glm::vec3(1.0f);
 				vertices.push_back(vertex);
 				indices.push_back(index_offset + v);
 			}
@@ -42,6 +43,8 @@ Model::Model(std::string id, std::string filename, VulkanDevice &device, VkQueue
 			shapes[s].mesh.material_ids[f];
 		}
 	}
+
+	indexCount = static_cast<uint32_t>(indices.size());
 
 	const size_t vbSize = vertices.size() * sizeof(Vertex); 
 	const size_t ibSize = indices.size() * sizeof(uint32_t);
@@ -98,4 +101,13 @@ Model::~Model()
 	vkFreeMemory(device, vertexBuffer.memory, nullptr);
 	vkDestroyBuffer(device, indexBuffer.buffer, nullptr);
 	vkFreeMemory(device, indexBuffer.memory, nullptr);
+}
+
+void Model::draw(VkCommandBuffer commandBuffer)
+{
+	const VkDeviceSize offset{ 0 };
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.buffer, &offset);
+	vkCmdBindIndexBuffer(commandBuffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+	vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
+
 }

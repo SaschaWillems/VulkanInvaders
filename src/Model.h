@@ -24,15 +24,16 @@ private:
 	VkQueue queue;
 	VulkanDeviceBuffer vertexBuffer;
 	VulkanDeviceBuffer indexBuffer;
+	uint32_t indexCount;
+public:
 	struct Vertex {
 		glm::vec3 position;
 		glm::vec3 normal;
 		glm::vec2 uv;
+		glm::vec3 color;
 	};
-	std::vector<Vertex> vertices;
-	std::vector<uint32_t> indices;
-public:
 	std::string id;
 	Model(std::string id, std::string filename, VulkanDevice &device, VkQueue queue, VkCommandPool commandPool);
 	~Model();
+	void draw(VkCommandBuffer commandBuffer);
 };

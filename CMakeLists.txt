@@ -94,7 +94,7 @@ ENDIF(WIN32)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/")
 
 file(GLOB SOURCE src/*.cpp)
-file(GLOB SHADERS "../data/shaders/*.*")
+file(GLOB SHADERS "data/shaders/*.*")
 source_group("Shaders" FILES ${SHADERS})
 
 if(WIN32)
