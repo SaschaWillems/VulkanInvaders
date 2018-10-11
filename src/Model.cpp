@@ -26,6 +26,7 @@ Model::Model(std::string id, std::string filename, VulkanDevice &device, VkQueue
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
 	for (size_t s = 0; s < shapes.size(); s++) {
+		size_t index_start = indices.size();
 		size_t index_offset = 0;
 		for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
 			int fv = shapes[s].mesh.num_face_vertices[f];
@@ -37,7 +38,7 @@ Model::Model(std::string id, std::string filename, VulkanDevice &device, VkQueue
 				vertex.uv = glm::make_vec2(&attrib.texcoords[2 * idx.texcoord_index]);
 				vertex.color = glm::vec3(1.0f);
 				vertices.push_back(vertex);
-				indices.push_back(index_offset + v);
+				indices.push_back(index_offset + index_start + v);
 			}
 			index_offset += fv;
 			shapes[s].mesh.material_ids[f];
@@ -109,5 +110,4 @@ void Model::draw(VkCommandBuffer commandBuffer)
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.buffer, &offset);
 	vkCmdBindIndexBuffer(commandBuffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 	vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
-
 }
