@@ -7,6 +7,11 @@
 */
 
 #include "Renderer.h"
+#include "ResourceManager.h"
+#include "EntityManager.h"
+#include "PlayerShip.h"
+#include "EnemyShip.h"
+#include "Projectile.h"
 
 #pragma once
 
@@ -14,6 +19,10 @@ class VulkanInvaders
 {
 private:
 	Renderer *renderer;
+	ResourceManager *resourceManager;
+	EntityManager *entityManager;
+
+	void loadAssets();
 public:
 	bool quit = false;
 

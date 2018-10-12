@@ -20,7 +20,7 @@
 class Model
 {
 private:
-	VulkanDevice &device;
+	VulkanDevice *device;
 	VkQueue queue;
 	VulkanDeviceBuffer vertexBuffer;
 	VulkanDeviceBuffer indexBuffer;
@@ -33,7 +33,7 @@ public:
 		glm::vec3 color;
 	};
 	std::string id;
-	Model(std::string id, std::string filename, VulkanDevice &device, VkQueue queue, VkCommandPool commandPool);
+	Model(std::string id, std::string filename, VulkanDevice *device, VkQueue queue, VkCommandPool commandPool);
 	~Model();
 	void draw(VkCommandBuffer commandBuffer);
 };

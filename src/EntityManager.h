@@ -18,6 +18,7 @@ public:
 	EntityManager();
 	~EntityManager();
 	void addEntity(std::string id, GameEntity *entity);
+	bool removeEntity(const std::string id);
 	GameEntity* getEntity(std::string id);
 };
 

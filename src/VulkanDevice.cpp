@@ -21,6 +21,8 @@ VulkanDevice::VulkanDevice(VkPhysicalDevice physicalDevice, VkDevice device)
 
 VulkanDevice::~VulkanDevice()
 {
+	int tst = 1;
+	tst += 1;
 }
 
 uint32_t VulkanDevice::getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties)
@@ -39,6 +41,7 @@ uint32_t VulkanDevice::getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFla
 VulkanDeviceBuffer VulkanDevice::createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, VkDeviceSize size, void *data)
 {
 	VulkanDeviceBuffer buffer;
+	buffer.device = this->device;
 
 	VkBufferCreateInfo bufferCI{};
 	bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -72,4 +75,13 @@ VulkanDeviceBuffer VulkanDevice::createBuffer(VkBufferUsageFlags usageFlags, VkM
 	VK_CHECK_RESULT(vkBindBufferMemory(device, buffer.buffer, buffer.memory, 0));
 
 	return buffer;
+}
+
+VulkanDeviceBuffer::operator VkDescriptorBufferInfo()
+{
+	VkDescriptorBufferInfo descriptorBufferInfo{};
+	descriptorBufferInfo.buffer = buffer;
+	descriptorBufferInfo.offset = 0;
+	descriptorBufferInfo.range = VK_WHOLE_SIZE;
+	return descriptorBufferInfo;
 }

@@ -17,10 +17,18 @@
 
 class VulkanDeviceBuffer {
 public:
+	VkDevice device;
 	VkBuffer buffer;
 	VkDeviceMemory memory;
 	VkDeviceSize size;
 	void* mapped = nullptr;
+
+	operator VkDescriptorBufferInfo();
+
+	void destroy() {
+		vkDestroyBuffer(device, buffer, nullptr);
+		vkFreeMemory(device, memory, nullptr);
+	}
 };
 
 class VulkanDevice

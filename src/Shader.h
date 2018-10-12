@@ -18,11 +18,11 @@
 class Shader
 {
 private:
-	VulkanDevice &device;
+	VulkanDevice *device;
 	VkShaderModule shaderModule;
 public:
 	std::string id;
-	Shader(std::string id, std::string filename, VulkanDevice &device);
+	Shader(std::string id, std::string filename, VulkanDevice *device);
 	~Shader();
 
 	operator VkShaderModule() { return shaderModule; };

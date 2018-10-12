@@ -34,7 +34,7 @@ VkBool32 debugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSe
 	if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) {
 		prefix = "GENERAL: ";
 	}
-	std::cout << prefix << "ID: " << pCallbackData->messageIdNumber << " NAME : " << pCallbackData->pMessageIdName << std::endl << pCallbackData->pMessage << std::endl;
+	std::cout << prefix << "ID: " << pCallbackData->messageIdNumber << " NAME : " << pCallbackData->pMessageIdName << std::endl << pCallbackData->pMessage << std::endl << std::endl;
 
 	return VK_FALSE;
 }
@@ -527,11 +527,19 @@ Renderer::Renderer()
 		createSwapchain();
 	}
 
+	// Pipeline cache
+	{
+		VkPipelineCacheCreateInfo pipelineCI{};
+		pipelineCI.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+		VK_CHECK_RESULT(vkCreatePipelineCache(device, &pipelineCI, nullptr, &pipelineCache));
+	}
+
 	// Base resources
 	{
 		VkCommandPoolCreateInfo commandPoolCI{};
 		commandPoolCI.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		commandPoolCI.queueFamilyIndex = graphicsQueueFamilyIndex;
+		commandPoolCI.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCI, nullptr, &commandPool));
 	}
 
@@ -557,14 +565,33 @@ Renderer::Renderer()
 			VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &frame.commandBuffer));
 		}
 	}
-
-	updateCommandBuffers();
 }
 
 Renderer::~Renderer()
 {
 	vkDeviceWaitIdle(device);
+	for (auto res : frameResources) {
+		vkDestroyFence(device, res.waitFence, nullptr);
+		vkDestroySemaphore(device, res.drawCompleteSemaphore, nullptr);
+		vkDestroySemaphore(device, res.imageAcquiredSemaphore, nullptr);
+	}
+	for (auto res : swapchainResources) {
+		vkDestroyFramebuffer(device, res.framebuffer, nullptr);
+		vkDestroyImageView(device, res.view, nullptr);
+	}
+	camera.ubo.destroy();
+	vkDestroySwapchainKHR(device, swapchain, nullptr);
+	vkDestroyRenderPass(device, renderpass, nullptr);
+	vkDestroyCommandPool(device, commandPool, nullptr);
+	vkDestroyPipelineCache(device, pipelineCache, nullptr);
+	vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+	vkDestroyPipeline(device, pipeline, nullptr);
+	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+	for (auto ds : descriptorSetLayouts) {
+		vkDestroyDescriptorSetLayout(device, ds, nullptr);
+	}
 	vkDestroyDevice(device, nullptr);
+	vkDestroyDebugUtilsMessengerEXT(instance, debugUtilsMessenger, nullptr);
 	vkDestroyInstance(instance, nullptr);
 	delete vulkanDevice;
 }
@@ -572,7 +599,7 @@ Renderer::~Renderer()
 void Renderer::updateCommandBuffers()
 {
 	VkClearValue clearValues[2];
-	clearValues[0].color = { { 0.0f, 0.0f, 0.2f, 1.0f } };
+	clearValues[0].color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
 	clearValues[1].depthStencil = { 1.0f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo{};
@@ -604,6 +631,17 @@ void Renderer::updateCommandBuffers()
 		VkRect2D scissor = { { 0, 0 },{ width, height } };
 		vkCmdSetScissor(frameResources[i].commandBuffer, 0, 1, &scissor);
 
+		vkCmdBindPipeline(frameResources[i].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+		for (auto entity : entityManager->entities) {
+			const std::vector<VkDescriptorSet> descriptorsets = {
+				camera.descriptorSet,
+				entity.second->descriptorSet,
+			};
+			vkCmdBindDescriptorSets(frameResources[i].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, static_cast<uint32_t>(descriptorsets.size()), descriptorsets.data(), 0, NULL);
+			entity.second->draw(frameResources[i].commandBuffer);
+		}
+
 		vkCmdEndRenderPass(frameResources[i].commandBuffer);
 
 		VK_CHECK_RESULT(vkEndCommandBuffer(frameResources[i].commandBuffer));
@@ -612,6 +650,8 @@ void Renderer::updateCommandBuffers()
 
 void Renderer::draw()
 {
+	auto tStart = std::chrono::high_resolution_clock::now();
+
 	vkWaitForFences(device, 1, &frameResources[currentFrame].waitFence, VK_TRUE, UINT64_MAX);
 	vkResetFences(device, 1, &frameResources[currentFrame].waitFence);
 
@@ -640,4 +680,168 @@ void Renderer::draw()
 
 	currentFrame += 1;
 	currentFrame %= static_cast<uint32_t>(frameResources.size());
+
+	auto tEnd = std::chrono::high_resolution_clock::now();
+	auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+
+	lastFrameTime = (float)tDiff / 1000.0f;
+}
+
+void Renderer::createPipelines()
+{
+	// Dummies for testing
+
+	std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 128 },
+	};
+
+	VkDescriptorPoolCreateInfo descriptorPoolCI{};
+	descriptorPoolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	descriptorPoolCI.pPoolSizes = descriptorPoolSizes.data();
+	descriptorPoolCI.poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size());
+	descriptorPoolCI.maxSets = 256;
+	VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolCI, nullptr, &descriptorPool));
+
+	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
+		{ 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr },
+	};
+
+	descriptorSetLayouts.resize(2);
+
+	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI{};
+	descriptorSetLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	descriptorSetLayoutCI.pBindings = setLayoutBindings.data();
+	descriptorSetLayoutCI.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts[0]));
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCI, nullptr, &descriptorSetLayouts[1]));
+
+	// Pipeline layout
+	VkPipelineLayoutCreateInfo pipelineLayoutCI{};
+	pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutCI.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
+	pipelineLayoutCI.pSetLayouts = descriptorSetLayouts.data();
+	VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCI, nullptr, &pipelineLayout));
+
+	// Pipeline
+
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI{};
+	inputAssemblyStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssemblyStateCI.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+	VkPipelineRasterizationStateCreateInfo rasterizationStateCI{};
+	rasterizationStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizationStateCI.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizationStateCI.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizationStateCI.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rasterizationStateCI.lineWidth = 1.0f;
+
+	VkPipelineColorBlendAttachmentState blendAttachmentState{};
+	blendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	blendAttachmentState.blendEnable = VK_FALSE;
+
+	VkPipelineColorBlendStateCreateInfo colorBlendStateCI{};
+	colorBlendStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlendStateCI.attachmentCount = 1;
+	colorBlendStateCI.pAttachments = &blendAttachmentState;
+
+	VkPipelineDepthStencilStateCreateInfo depthStencilStateCI{};
+	depthStencilStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depthStencilStateCI.depthTestEnable = VK_FALSE;
+	depthStencilStateCI.depthWriteEnable = VK_FALSE;
+	depthStencilStateCI.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+	depthStencilStateCI.front = depthStencilStateCI.back;
+	depthStencilStateCI.back.compareOp = VK_COMPARE_OP_ALWAYS;
+
+	VkPipelineViewportStateCreateInfo viewportStateCI{};
+	viewportStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportStateCI.viewportCount = 1;
+	viewportStateCI.scissorCount = 1;
+
+	VkPipelineMultisampleStateCreateInfo multisampleStateCI{};
+	multisampleStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampleStateCI.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+	std::vector<VkDynamicState> dynamicStateEnables = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR
+	};
+	VkPipelineDynamicStateCreateInfo dynamicStateCI{};
+	dynamicStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicStateCI.pDynamicStates = dynamicStateEnables.data();
+	dynamicStateCI.dynamicStateCount = static_cast<uint32_t>(dynamicStateEnables.size());
+
+	// Vertex bindings an attributes
+	VkVertexInputBindingDescription vertexInputBinding = { 0, sizeof(Model::Vertex), VK_VERTEX_INPUT_RATE_VERTEX };
+	std::vector<VkVertexInputAttributeDescription> vertexInputAttributes = {
+		{ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
+		{ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, sizeof(float) * 3 },
+		{ 2, 0, VK_FORMAT_R32G32_SFLOAT, sizeof(float) * 6 },
+		{ 3, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 8 },
+	};
+	VkPipelineVertexInputStateCreateInfo vertexInputStateCI{};
+	vertexInputStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputStateCI.vertexBindingDescriptionCount = 1;
+	vertexInputStateCI.pVertexBindingDescriptions = &vertexInputBinding;
+	vertexInputStateCI.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttributes.size());
+	vertexInputStateCI.pVertexAttributeDescriptions = vertexInputAttributes.data();
+
+	// Pipelines
+	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
+	VkGraphicsPipelineCreateInfo pipelineCI{};
+	pipelineCI.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineCI.layout = pipelineLayout;
+	pipelineCI.renderPass = renderpass;
+	pipelineCI.pInputAssemblyState = &inputAssemblyStateCI;
+	pipelineCI.pVertexInputState = &vertexInputStateCI;
+	pipelineCI.pRasterizationState = &rasterizationStateCI;
+	pipelineCI.pColorBlendState = &colorBlendStateCI;
+	pipelineCI.pMultisampleState = &multisampleStateCI;
+	pipelineCI.pViewportState = &viewportStateCI;
+	pipelineCI.pDepthStencilState = &depthStencilStateCI;
+	pipelineCI.pDynamicState = &dynamicStateCI;
+	pipelineCI.stageCount = 2;
+	pipelineCI.pStages = shaderStages.data();
+
+	// Skybox pipeline (background cube)
+	shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+	shaderStages[0].pName = "main";
+	shaderStages[0].module = *resourceManager->getShader("player_ship_vs");
+	shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shaderStages[1].pName = "main";
+	shaderStages[1].module = *resourceManager->getShader("player_ship_fs");
+
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+
+	// Camera
+	{
+		camera.type = Camera::CameraType::lookat;
+		camera.setPerspective(45.0f, (float)width / (float)height, 0.1f, 256.0f);
+		camera.setPosition({ 0.0f, 0.0f, -30.0f });
+		camera.update(0.0f);
+
+		camera.ubo = vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, sizeof(camera.matrices), &camera.matrices);
+
+		VkDescriptorSetAllocateInfo descriptorSetAllocInfo{};
+		descriptorSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		descriptorSetAllocInfo.descriptorPool = descriptorPool;
+		descriptorSetAllocInfo.pSetLayouts = &descriptorSetLayouts[0];
+		descriptorSetAllocInfo.descriptorSetCount = 1;
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocInfo, &camera.descriptorSet));
+		
+		VkWriteDescriptorSet writeDescriptorSet{};
+		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		writeDescriptorSet.descriptorCount = 1;
+		writeDescriptorSet.dstSet = camera.descriptorSet;
+		writeDescriptorSet.dstBinding = 0;
+		writeDescriptorSet.pBufferInfo = &VkDescriptorBufferInfo(camera.ubo);
+		vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
+	}
+
+	// Player ship
+	{
+
+	}
 }

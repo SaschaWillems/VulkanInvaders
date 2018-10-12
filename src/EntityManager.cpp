@@ -14,11 +14,19 @@ EntityManager::EntityManager()
 
 EntityManager::~EntityManager()
 {
+	for (auto &entity : entities) {
+		delete entity.second;
+	}
 }
 
 void EntityManager::addEntity(std::string id, GameEntity *entity)
 {
 	entities.emplace(id, entity);
+}
+
+bool EntityManager::removeEntity(const std::string id)
+{
+	return (entities.erase(id) > 0);
 }
 
 GameEntity* EntityManager::getEntity(std::string id)

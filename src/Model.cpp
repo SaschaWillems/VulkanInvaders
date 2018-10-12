@@ -9,14 +9,14 @@
 #include "Model.h"
 #include "tiny_obj_loader.h"
 
-Model::Model(std::string id, std::string filename, VulkanDevice &device, VkQueue queue, VkCommandPool commandPool) : id(id), device(device), queue(queue)
+Model::Model(std::string id, std::string filename, VulkanDevice *device, VkQueue queue, VkCommandPool commandPool) : id(id), device(device), queue(queue)
 {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
 
 	std::string err;
-	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, filename.c_str());
+	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, filename.c_str(), "data/models");
 
 	if (!err.empty()) {
 		std::cerr << "Could not load model \"" << filename << "\":" << err << std::endl;
@@ -35,8 +35,10 @@ Model::Model(std::string id, std::string filename, VulkanDevice &device, VkQueue
 				tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
 				vertex.position = glm::make_vec3(&attrib.vertices[3 * idx.vertex_index]);
 				vertex.normal = glm::make_vec3(&attrib.normals[3 * idx.normal_index]);
-				vertex.uv = glm::make_vec2(&attrib.texcoords[2 * idx.texcoord_index]);
-				vertex.color = glm::vec3(1.0f);
+				vertex.uv = glm::make_vec2(&attrib.texcoords[2 * idx.texcoord_index]);				
+				if (attrib.colors.size() > 0) {
+					vertex.color = glm::make_vec3(&attrib.colors[3 * idx.vertex_index]);
+				}
 				vertices.push_back(vertex);
 				indices.push_back(index_offset + index_start + v);
 			}
@@ -50,11 +52,11 @@ Model::Model(std::string id, std::string filename, VulkanDevice &device, VkQueue
 	const size_t vbSize = vertices.size() * sizeof(Vertex); 
 	const size_t ibSize = indices.size() * sizeof(uint32_t);
 
-	VulkanDeviceBuffer vertexStaging = device.createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vbSize, vertices.data());
-	VulkanDeviceBuffer indexStaging = device.createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, ibSize, indices.data());
+	VulkanDeviceBuffer vertexStaging = device->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vbSize, vertices.data());
+	VulkanDeviceBuffer indexStaging = device->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, ibSize, indices.data());
 
-	vertexBuffer = device.createBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vbSize);
-	indexBuffer = device.createBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, ibSize);
+	vertexBuffer = device->createBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vbSize);
+	indexBuffer = device->createBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, ibSize);
 
 	VkCommandBuffer copyCmd;
 
@@ -63,7 +65,7 @@ Model::Model(std::string id, std::string filename, VulkanDevice &device, VkQueue
 	cbAllocateInfo.commandPool = commandPool;
 	cbAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	cbAllocateInfo.commandBufferCount = 1;
-	VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cbAllocateInfo, &copyCmd));
+	VK_CHECK_RESULT(vkAllocateCommandBuffers((VkDevice)*device, &cbAllocateInfo, &copyCmd));
 
 	VkCommandBufferBeginInfo cbBeginInfo{};
 	cbBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -83,25 +85,25 @@ Model::Model(std::string id, std::string filename, VulkanDevice &device, VkQueue
 	VkFenceCreateInfo fenceInfoCI{};
 	fenceInfoCI.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	VkFence fence;
-	VK_CHECK_RESULT(vkCreateFence(device, &fenceInfoCI, nullptr, &fence));
+	VK_CHECK_RESULT(vkCreateFence((VkDevice)*device, &fenceInfoCI, nullptr, &fence));
 
 	VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, fence));
-	VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000));
+	VK_CHECK_RESULT(vkWaitForFences((VkDevice)*device, 1, &fence, VK_TRUE, 100000000000));
 
-	vkDestroyFence(device, fence, nullptr);
+	vkDestroyFence((VkDevice)*device, fence, nullptr);
 
-	vkDestroyBuffer(device, vertexStaging.buffer, nullptr);
-	vkFreeMemory(device, vertexStaging.memory, nullptr);
-	vkDestroyBuffer(device, indexStaging.buffer, nullptr);
-	vkFreeMemory(device, indexStaging.memory, nullptr);
+	vkDestroyBuffer((VkDevice)*device, vertexStaging.buffer, nullptr);
+	vkFreeMemory((VkDevice)*device, vertexStaging.memory, nullptr);
+	vkDestroyBuffer((VkDevice)*device, indexStaging.buffer, nullptr);
+	vkFreeMemory((VkDevice)*device, indexStaging.memory, nullptr);
 }
 
 Model::~Model()
 {
-	vkDestroyBuffer(device, vertexBuffer.buffer, nullptr);
-	vkFreeMemory(device, vertexBuffer.memory, nullptr);
-	vkDestroyBuffer(device, indexBuffer.buffer, nullptr);
-	vkFreeMemory(device, indexBuffer.memory, nullptr);
+	vkDestroyBuffer((VkDevice)*device, vertexBuffer.buffer, nullptr);
+	vkFreeMemory((VkDevice)*device, vertexBuffer.memory, nullptr);
+	vkDestroyBuffer((VkDevice)*device, indexBuffer.buffer, nullptr);
+	vkFreeMemory((VkDevice)*device, indexBuffer.memory, nullptr);
 }
 
 void Model::draw(VkCommandBuffer commandBuffer)

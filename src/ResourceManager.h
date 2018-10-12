@@ -19,11 +19,11 @@
 class ResourceManager
 {
 private:
-	VulkanDevice &device;
+	VulkanDevice *device;
 	VkCommandPool commandPool;
 	VkQueue queue;
 public:
-	ResourceManager(VulkanDevice &device, VkQueue queue, VkCommandPool commandPool);
+	ResourceManager(VulkanDevice *device, VkQueue queue, VkCommandPool commandPool);
 	~ResourceManager();
 
 	std::unordered_map<std::string, Model*> models;

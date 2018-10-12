@@ -8,7 +8,7 @@
 
 #include "Shader.h"
 
-Shader::Shader(std::string id, std::string filename, VulkanDevice &device) : id(id), device(device)
+Shader::Shader(std::string id, std::string filename, VulkanDevice *device) : id(id), device(device)
 {
 	std::ifstream is(filename, std::ios::binary | std::ios::in | std::ios::ate);
 
@@ -24,7 +24,7 @@ Shader::Shader(std::string id, std::string filename, VulkanDevice &device) : id(
 		shaderModuleCI.codeSize = size;
 		shaderModuleCI.pCode = (uint32_t*)shaderCode;
 
-		VK_CHECK_RESULT(vkCreateShaderModule(device, &shaderModuleCI, NULL, &shaderModule));
+		VK_CHECK_RESULT(vkCreateShaderModule((VkDevice)*device, &shaderModuleCI, NULL, &shaderModule));
 
 		delete[] shaderCode;
 	} else {
@@ -34,5 +34,5 @@ Shader::Shader(std::string id, std::string filename, VulkanDevice &device) : id(
 
 Shader::~Shader()
 {
-	//vkDestroyShaderModule(device, shaderModule, nullptr);
+	vkDestroyShaderModule((VkDevice)*device, shaderModule, nullptr);
 }

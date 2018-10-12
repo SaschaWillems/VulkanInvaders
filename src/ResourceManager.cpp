@@ -8,7 +8,7 @@
 
 #include "ResourceManager.h"
 
-ResourceManager::ResourceManager(VulkanDevice &device, VkQueue queue, VkCommandPool commandPool) : device(device), queue(queue), commandPool(commandPool) { }
+ResourceManager::ResourceManager(VulkanDevice *device, VkQueue queue, VkCommandPool commandPool) : device(device), queue(queue), commandPool(commandPool) { }
 
 ResourceManager::~ResourceManager()
 {

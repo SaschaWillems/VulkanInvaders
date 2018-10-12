@@ -11,8 +11,14 @@
 #include <iostream>
 #include <assert.h>
 #include <string>
+#include <chrono>
+#include <glm/glm.hpp>
 #include "vulkan/vulkan.h"
 
+#include "ResourceManager.h"
+#include "EntityManager.h"
+#include "Camera.h"
+#include "Model.h"
 #include "VulkanUtils.h"
 #include "VulkanDevice.h"
 
@@ -40,6 +46,7 @@ private:
 	VkQueue graphicsQueue;
 	VkCommandPool commandPool;
 	VkRenderPass renderpass;
+	VkPipelineCache pipelineCache;
 
 	VkSurfaceKHR surface;
 
@@ -70,8 +77,17 @@ private:
 	uint32_t currentFrame = 0;
 	std::vector<FrameResource> frameResources;
 
-	uint32_t width = 1280;
-	uint32_t height = 720;
+	uint32_t width = 224 * 2;
+	uint32_t height = 256 * 2;
+
+	// Dummy
+	VkDescriptorPool descriptorPool;
+	std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+	VkPipelineLayout pipelineLayout;
+	VkPipeline pipeline;
+	VulkanDeviceBuffer sceneUniformBuffer;
+
+	Camera camera;
 
 	struct Settings {
 		bool validation = true;
@@ -80,11 +96,12 @@ private:
 	} settings;
 
 	void createSwapchain();
-	void updateCommandBuffers();
 public:
 	Renderer();
 	~Renderer();
 
+	ResourceManager *resourceManager;
+	EntityManager *entityManager;
 	VulkanDevice *vulkanDevice;
 
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
@@ -93,10 +110,16 @@ public:
 	static WNDPROC wndProc;
 #endif
 
+	float lastFrameTime = 0.0f;
+
+	void updateCommandBuffers();
+	void createPipelines();
+
 	void draw();
 
-	VulkanDevice getDevice() { return *vulkanDevice; }
+	VulkanDevice *getDevice() { return vulkanDevice; }
 	VkQueue getQueue() { return graphicsQueue; }
 	VkCommandPool getCommandPool() { return commandPool; }
+	VkDescriptorPool getDescriptorPool() { return descriptorPool;  }
 };
 
