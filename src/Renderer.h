@@ -28,6 +28,12 @@ struct SwapchainResource {
 	VkImage image;
 	VkImageView view;
 	VkFramebuffer framebuffer;
+	struct Depth {
+		VkImage image;
+		VkDeviceMemory memory;
+		VkImageView view;
+	} depth;
+
 };
 
 struct FrameResource {
@@ -68,6 +74,7 @@ private:
 	uint32_t presentQueueFamilyIndex;
 
 	VkFormat colorFormat;
+	VkFormat depthFormat;
 	VkColorSpaceKHR colorSpace;
 	uint32_t swapchainImageCount;
 	std::vector<SwapchainResource> swapchainResources;

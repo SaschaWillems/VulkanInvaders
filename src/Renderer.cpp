@@ -145,9 +145,62 @@ void Renderer::createSwapchain()
 		VK_CHECK_RESULT(vkCreateImageView(device, &colorAttachmentViewCI, nullptr, &swapchainResources[i].view));
 	}
 
+	// Depth 
+	{
+		bool validDepthFormat = false;
+		std::vector<VkFormat> depthFormats = { VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D16_UNORM_S8_UINT, VK_FORMAT_D16_UNORM };
+		for (auto& format : depthFormats) {
+			VkFormatProperties formatProperties;
+			vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &formatProperties);
+			if (formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+				depthFormat = format;
+				validDepthFormat = true;
+				break;
+			}
+		}
+		assert(validDepthFormat);
+
+		VkImageCreateInfo imageCI{};
+		imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageCI.imageType = VK_IMAGE_TYPE_2D;
+		imageCI.format = depthFormat;
+		imageCI.extent = { width, height, 1 };
+		imageCI.mipLevels = 1;
+		imageCI.arrayLayers = 1;
+		imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
+		VkImageViewCreateInfo depthStencilViewCI{};
+		depthStencilViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		depthStencilViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		depthStencilViewCI.format = depthFormat;
+		depthStencilViewCI.subresourceRange = {};
+		depthStencilViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		depthStencilViewCI.subresourceRange.baseMipLevel = 0;
+		depthStencilViewCI.subresourceRange.levelCount = 1;
+		depthStencilViewCI.subresourceRange.baseArrayLayer = 0;
+		depthStencilViewCI.subresourceRange.layerCount = 1;
+
+
+		for (uint32_t i = 0; i < swapchainImageCount; i++) {
+			VK_CHECK_RESULT(vkCreateImage(device, &imageCI, nullptr, &swapchainResources[i].depth.image));
+			VkMemoryRequirements memReqs{};
+			vkGetImageMemoryRequirements(device, swapchainResources[i].depth.image, &memReqs);
+			VkMemoryAllocateInfo memoryAI{};
+			memoryAI.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+			memoryAI.allocationSize = memReqs.size;
+			memoryAI.memoryTypeIndex = vulkanDevice->getMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			VK_CHECK_RESULT(vkAllocateMemory(device, &memoryAI, nullptr, &swapchainResources[i].depth.memory));
+			VK_CHECK_RESULT(vkBindImageMemory(device, swapchainResources[i].depth.image, swapchainResources[i].depth.memory, 0));
+			depthStencilViewCI.image = swapchainResources[i].depth.image;
+			VK_CHECK_RESULT(vkCreateImageView(device, &depthStencilViewCI, nullptr, &swapchainResources[i].depth.view));
+		}
+	}
+
 	// Renderpass
 	{
-		std::array<VkAttachmentDescription, 1> attachmentDescriptions{};
+		std::array<VkAttachmentDescription, 2> attachmentDescriptions{};
 
 		attachmentDescriptions[0].format = colorFormat;
 		attachmentDescriptions[0].samples = VK_SAMPLE_COUNT_1_BIT;
@@ -157,7 +210,7 @@ void Renderer::createSwapchain()
 		attachmentDescriptions[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachmentDescriptions[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		attachmentDescriptions[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		/*
+
 		attachmentDescriptions[1].format = depthFormat;
 		attachmentDescriptions[1].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachmentDescriptions[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -166,7 +219,6 @@ void Renderer::createSwapchain()
 		attachmentDescriptions[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachmentDescriptions[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		attachmentDescriptions[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		*/
 
 		VkAttachmentReference colorReference = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 		VkAttachmentReference depthReference = { 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
@@ -175,7 +227,7 @@ void Renderer::createSwapchain()
 		subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpassDescription.colorAttachmentCount = 1;
 		subpassDescription.pColorAttachments = &colorReference;
-		//subpassDescription.pDepthStencilAttachment = &depthReference;
+		subpassDescription.pDepthStencilAttachment = &depthReference;
 
 		std::array<VkSubpassDependency, 2> dependencies;
 
@@ -209,13 +261,12 @@ void Renderer::createSwapchain()
 
 	// Framebuffers
 	{
-		VkImageView attachments[1];
-		//attachments[1] = depthStencil.view;
+		VkImageView attachments[2];
 
 		VkFramebufferCreateInfo frameBufferCI{};
 		frameBufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		frameBufferCI.renderPass = renderpass;
-		frameBufferCI.attachmentCount = 1;
+		frameBufferCI.attachmentCount = 2;
 		frameBufferCI.pAttachments = attachments;
 		frameBufferCI.width = width;
 		frameBufferCI.height = height;
@@ -224,6 +275,7 @@ void Renderer::createSwapchain()
 		// Create frame buffers for every swap chain image
 		for (uint32_t i = 0; i < swapchainImageCount; i++) {
 			attachments[0] = swapchainResources[i].view;
+			attachments[1] = swapchainResources[i].depth.view;
 			VK_CHECK_RESULT(vkCreateFramebuffer(device, &frameBufferCI, nullptr, &swapchainResources[i].framebuffer));
 		}
 	}
@@ -578,6 +630,9 @@ Renderer::~Renderer()
 	for (auto res : swapchainResources) {
 		vkDestroyFramebuffer(device, res.framebuffer, nullptr);
 		vkDestroyImageView(device, res.view, nullptr);
+		vkDestroyImage(device, res.depth.image, nullptr);
+		vkDestroyImageView(device, res.depth.view, nullptr);
+		vkFreeMemory(device, res.depth.memory, nullptr);
 	}
 	camera.ubo.destroy();
 	vkDestroySwapchainKHR(device, swapchain, nullptr);
@@ -746,8 +801,8 @@ void Renderer::createPipelines()
 
 	VkPipelineDepthStencilStateCreateInfo depthStencilStateCI{};
 	depthStencilStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depthStencilStateCI.depthTestEnable = VK_FALSE;
-	depthStencilStateCI.depthWriteEnable = VK_FALSE;
+	depthStencilStateCI.depthTestEnable = VK_TRUE;
+	depthStencilStateCI.depthWriteEnable = VK_TRUE;
 	depthStencilStateCI.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 	depthStencilStateCI.front = depthStencilStateCI.back;
 	depthStencilStateCI.back.compareOp = VK_COMPARE_OP_ALWAYS;
@@ -838,10 +893,5 @@ void Renderer::createPipelines()
 		writeDescriptorSet.dstBinding = 0;
 		writeDescriptorSet.pBufferInfo = &VkDescriptorBufferInfo(camera.ubo);
 		vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, nullptr);
-	}
-
-	// Player ship
-	{
-
 	}
 }
