@@ -12,6 +12,9 @@ void VulkanInvaders::loadAssets()
 {
 	resourceManager->loadModel("player_ship", "data/models/playership.obj");
 	resourceManager->loadModel("enemy_01", "data/models/enemy01.obj");
+	resourceManager->loadModel("invader_01", "data/models/invader01.obj");
+	resourceManager->loadModel("invader_02", "data/models/invader02.obj");
+	resourceManager->loadModel("invader_03", "data/models/invader03.obj");
 	resourceManager->loadModel("projectile", "data/models/projectile.obj");
 	resourceManager->loadShader("player_ship_vs", "data/shaders/playership.vert.spv");
 	resourceManager->loadShader("player_ship_fs", "data/shaders/playership.frag.spv");
@@ -38,7 +41,24 @@ VulkanInvaders::VulkanInvaders()
 	glm::vec3 origin = glm::vec3(-10.0f, -10.0f, 0.0f);
 	for (int32_t x = 0; x < 5; x++) {
 		for (int32_t y = 0; y < 5; y++) {
-			EnemyShip *enemyShip = new EnemyShip(resourceManager->getModel("enemy_01"), origin + glm::vec3((float)x * 3.0f, (float)y * 2.0f, 0.0f));
+			Model *model;
+			switch (y) {
+				case 0: 
+					model = resourceManager->getModel("invader_03");
+					break;
+				case 1:
+				case 2:
+					model = resourceManager->getModel("invader_01");
+					break;
+				case 3:
+				case 4:
+					model = resourceManager->getModel("invader_02");
+					break;
+				default:
+					model = resourceManager->getModel("invader_01");
+					break;
+			}
+			EnemyShip *enemyShip = new EnemyShip(model, origin + glm::vec3((float)x * 3.0f, (float)y * 2.0f, 0.0f));
 			enemyShip->allocateResources(renderer->getDevice(), renderer->getDescriptorPool());
 			entityManager->addEntity("enemy_" + std::to_string(x) + "_" + std::to_string(y), enemyShip);
 		}

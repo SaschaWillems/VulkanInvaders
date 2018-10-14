@@ -15,7 +15,7 @@ Projectile::Projectile()
 Projectile::Projectile(Model *model, glm::vec3 position, glm::vec3 direction) : model(model), origin(position), direction(direction)
 {
 	this->position = position;
-	this->speed = glm::vec3(7.5f);
+	this->speed = glm::vec3(15.0f);
 	this->size = glm::vec3(0.25f, 0.5f, 0.25f);
 }
 

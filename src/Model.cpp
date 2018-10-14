@@ -35,7 +35,9 @@ Model::Model(std::string id, std::string filename, VulkanDevice *device, VkQueue
 				tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
 				vertex.position = glm::make_vec3(&attrib.vertices[3 * idx.vertex_index]);
 				vertex.normal = glm::make_vec3(&attrib.normals[3 * idx.normal_index]);
-				vertex.uv = glm::make_vec2(&attrib.texcoords[2 * idx.texcoord_index]);				
+				if (attrib.texcoords.size() > 0) {
+					vertex.uv = glm::make_vec2(&attrib.texcoords[2 * idx.texcoord_index]);
+				}
 				if (attrib.colors.size() > 0) {
 					vertex.color = glm::make_vec3(&attrib.colors[3 * idx.vertex_index]);
 				}
